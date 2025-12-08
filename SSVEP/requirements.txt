@@ -1,3 +1,5 @@
 pylsl
-keyboard
+numpy
+scipy
 pyserial
+
