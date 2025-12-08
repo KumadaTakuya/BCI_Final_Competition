@@ -11,7 +11,7 @@ thres = 100.0
 CHANNEL_COUNT = 2
 BUFFER_SIZE = 1000  # alpha 波需要約 1秒資料比較準 (1000 samples)
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
-ser = serial.Serial("COM3", 9600, timeout=10, write_timeout=10)
+ser = serial.Serial("COM6", 9600, timeout=10, write_timeout=10)
 
 # ======== EEG Reading Thread ============
 def read_eeg(inlet):

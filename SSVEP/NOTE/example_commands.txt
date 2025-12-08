@@ -1,0 +1,9 @@
+# 測試鍵盤是否可以控制車輛
+python utils/keyboard_reader.py COM3
+python main.py COM3 --input-mode keyboard
+
+# 測試EEG是否可以控制車輛
+python main.py COM3 --input-mode eeg
+
+# 測試SSVEP視覺刺激窗口（不需要車子和腦波儀）
+python test_stimulus.py

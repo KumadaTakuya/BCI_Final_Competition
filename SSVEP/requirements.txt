@@ -2,4 +2,6 @@ pylsl
 numpy
 scipy
 pyserial
+keyboard
+pygame
 

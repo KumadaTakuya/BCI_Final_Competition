@@ -3,6 +3,8 @@ import serial
 import time
 import os
 
+# example: python test_car.py COM3
+
 #### Must be change to suitable port [Bluetooth Outgoing]
 def main():
     import argparse

@@ -1,15 +1,15 @@
 """
-车辆控制模块
-负责接收动作字符串并发送串口指令到车辆
+車輛控制模組 / Car Control Module
+負責接收動作字串並發送串口指令到車輛 / Responsible for receiving action strings and sending serial port commands to the car
 """
 import serial
 import time
 
 
 class CarController:
-    """车辆控制器"""
+    """車輛控制器 / Car Controller"""
     
-    # 动作到命令的映射
+    # 動作到命令的映射 / Action to command mapping
     ACTION_COMMANDS = {
         "forward": b'1',
         "backward": b'2',
@@ -20,13 +20,13 @@ class CarController:
     
     def __init__(self, port=None, baudrate=9600, timeout=10, write_timeout=10):
         """
-        初始化车辆控制器
+        初始化車輛控制器 / Initialize Car Controller
         
         Args:
-            port: 串口号（如 "COM3"），如果为None则需要后续调用connect()时指定
-            baudrate: 波特率，默认9600
-            timeout: 读取超时时间（秒）
-            write_timeout: 写入超时时间（秒）
+            port: 串口號（如 "COM3"），如果為None則需要後續調用connect()時指定 / Serial port (e.g., "COM3"), if None, must be specified when calling connect()
+            baudrate: 波特率，預設9600 / Baud rate, default 9600
+            timeout: 讀取超時時間（秒） / Read timeout (seconds)
+            write_timeout: 寫入超時時間（秒） / Write timeout (seconds)
         """
         self.port = port
         self.baudrate = baudrate
@@ -37,13 +37,13 @@ class CarController:
     
     def connect(self, port=None):
         """
-        连接到车辆串口
+        連接到車輛串口 / Connect to car serial port
         
         Args:
-            port: 串口号，如果提供则覆盖初始化时的port
+            port: 串口號，如果提供則覆蓋初始化時的port / Serial port, if provided, overrides the port set during initialization
         
         Returns:
-            bool: 连接是否成功
+            bool: 連接是否成功 / Whether connection was successful
         """
         if port is not None:
             self.port = port
@@ -67,7 +67,7 @@ class CarController:
             return False
     
     def disconnect(self):
-        """断开串口连接"""
+        """斷開串口連接 / Disconnect serial port"""
         if self.ser and self.ser.is_open:
             self.ser.close()
             self.is_connected = False
@@ -75,13 +75,13 @@ class CarController:
     
     def send_action(self, action):
         """
-        发送动作指令到车辆
+        發送動作指令到車輛 / Send action command to car
         
         Args:
-            action: 动作字符串 ("forward", "backward", "left", "right", "stop")
+            action: 動作字串 ("forward", "backward", "left", "right", "stop") / Action string ("forward", "backward", "left", "right", "stop")
         
         Returns:
-            bool: 发送是否成功
+            bool: 發送是否成功 / Whether sending was successful
         """
         if not self.is_connected or self.ser is None or not self.ser.is_open:
             print("Warning: Car not connected. Cannot send action.")
@@ -100,12 +100,12 @@ class CarController:
             return False
     
     def __enter__(self):
-        """上下文管理器入口"""
+        """上下文管理器入口 / Context manager entry"""
         if self.port:
             self.connect()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器出口"""
+        """上下文管理器出口 / Context manager exit"""
         self.disconnect()
 
