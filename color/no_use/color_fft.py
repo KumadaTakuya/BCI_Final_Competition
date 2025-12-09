@@ -5,11 +5,14 @@ import threading
 # from scipy.signal import butter, filtfilt # 不需要了
 import serial
 
-# ======== 設定參數 ========
+
+# ======== background setting =========
 SAMPLE_RATE = 1000
 CHANNEL_COUNT = 2
-BUFFER_SIZE = 1000   # 1s (這剛好讓頻率解析度 Resolution = 1Hz，非常方便)
+BUFFER_SIZE = 1000   # 1s 
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
+
+
 
 # serial 設定
 # ser = serial.Serial("COM3", 9600, timeout=10, write_timeout=10)
@@ -17,7 +20,7 @@ eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
 action_window = []
 WINDOW_SIZE = 5  # 保留window次數
 
-# ======== 閾值 (注意：FFT 算出來的數值大小可能不同，請重新微調) ========
+# ========  ========
 THRESHOLD_FORWARD = 10000.0   # 閉眼 / 前進 α power
 THRESHOLD_LEFT_RATIO = 0.5  # 紅色 α/β ratio
 THRESHOLD_RIGHT_RATIO = 1.5 # 藍色 α/β ratio
@@ -33,14 +36,19 @@ freqs = np.fft.rfftfreq(BUFFER_SIZE, d=1/SAMPLE_RATE)
 # 形狀需為 (1, BUFFER_SIZE) 以便與 eeg_buffer (2, BUFFER_SIZE) 相乘
 window = np.hanning(BUFFER_SIZE).reshape(1, -1)
 
+
+
 # ======== EEG Reading Thread ============
 def read_eeg(inlet):
     global eeg_buffer
 
     while True:
         sample, timestamp = inlet.pull_sample()
+
         if sample:
-            # 假設你的設備 O1=Channel 4, O2=Channel 5
+
+            # Fp1=0, Fp2=1, 
+            # O1=4, O2=5
             selected_data = sample[4:6]
             sample_np = np.array(selected_data).reshape(-1, 1)
 
@@ -48,19 +56,24 @@ def read_eeg(inlet):
             eeg_buffer[:, :-1] = eeg_buffer[:, 1:]
             eeg_buffer[:, -1] = sample_np.flatten()
 
-# ======== 輔助函式：計算特定頻帶能量 ========
+
+
+# ======== get_band_power ========
 def get_band_power(psd, freq_axis, low, high):
     """
     psd: Power Spectral Density (已經平均過頻道的)
     freq_axis: 頻率軸
     low, high: 頻帶範圍
     """
-    # 找出在 low ~ high 範圍內的頻率 index
+
     idx = np.logical_and(freq_axis >= low, freq_axis <= high)
-    # 將該範圍內的能量加總 (也可以用 mean，看你習慣)
+    
     return np.sum(psd[idx])
 
-# ======== MAIN 控制邏輯 ============
+
+
+
+# ======== MAIN  ============
 def main():
     global action_window
 
@@ -70,6 +83,7 @@ def main():
     print("Blue (14-16Hz) → Right")
 
     while True:
+
         if np.abs(eeg_buffer[0, 0]) < 1e-6:
             time.sleep(0.1)
             continue
@@ -101,14 +115,14 @@ def main():
 
         ratio = alpha_power / (beta_power + 1e-6)
 
+
         # ====== 4. 動作判斷 (邏輯維持不變) ======
         action = "Stop"
 
         if ratio < THRESHOLD_LEFT_RATIO and red_power > THRESHOLD_RED:
             action = "Left"
 
-        elif ratio > THRESHOLD_RIGHT_RATIO and blue_power > THRESHOLD_BLUE: 
-            # 注意：這裡我把 THRESHOLD_RED 改成 THRESHOLD_BLUE，原本你的 code 寫 red
+        elif ratio > THRESHOLD_RIGHT_RATIO and blue_power > THRESHOLD_BLUE:
             action = "Right"
 
         elif alpha_power > THRESHOLD_FORWARD:
@@ -123,6 +137,8 @@ def main():
             action_window.pop(0)
 
         smooth_action = max(set(action_window), key=action_window.count)
+
+
 
         # ====== Serial 輸出 ======
         counts = {action: action_window.count(action) for action in set(action_window)}
@@ -143,22 +159,29 @@ def main():
         print(f"Act: {smooth_action} | α={alpha_power:.1f} β={beta_power:.1f} Ratio={ratio:.2f} | Red={red_power:.1f} Blue={blue_power:.1f}")
 
         # 稍微調整 sleep 時間，配合數據更新率
-        time.sleep(0.1)
+        time.sleep(0.2)
 
-# ======== LSL Setup (不變) ============
+
+# ======== LSL Setup  ============
+
 def setup_lsl_inlet(stream_name="Cygnus-083704-RawEEG"):
+
     print("Resolving streams...")
     streams = resolve_streams()
+
     if not streams:
         print("No streams found!")
         exit(1)
+
     for i, s in enumerate(streams):
         print(f"[{i}] {s.name()} - type: {s.type()}")
 
-    target_stream = streams[0]
+
     # 嘗試尋找指定名稱，找不到就用第一個
+    target_stream = streams[0]
+    
     for s in streams:
-        if stream_name in s.name(): # 使用 partial match 比較安全
+        if stream_name in s.name(): # partial match 
             target_stream = s
             break
             
@@ -178,6 +201,7 @@ if __name__ == "__main__":
 
     try:
         main()
+
     except KeyboardInterrupt:
         print("\nExiting...")
         exit(0)
