@@ -97,12 +97,13 @@ def main():
     display = MD.TimeDisplay()
     display.start()
 
-    current_time = 0.0
-
     mode_list = ["Forward", "Left", "Right"]
     current_mode = "Forward"
 
+    current_time = 0.0
+    step_time = float(len(mode_list)) * mode_keep_time
 
+    
     while True:
 
         if np.abs(eeg_buffer[0, 0]) < 1e-6:
@@ -196,8 +197,8 @@ def main():
 
         current_time += 0.2
 
-        if current_time >= 15.0:
-            current_time -= 15.0
+        if current_time >= step_time:
+            current_time -= step_time
 
 
         time.sleep(0.2)
