@@ -3,8 +3,6 @@ import numpy as np
 from serial import Serial
 from time import sleep
 from threading import Thread
-from scipy.signal import butter, sosfilt
-from typing import Tuple
 
 
 """
@@ -31,24 +29,20 @@ O2 = 5
 CHANNEL_COUNT = 4
 BUFFER_SIZE = 1000  # 1s
 ACTION_BUFFER_SIZE = 5
+MIN_VOTES = ACTION_BUFFER_SIZE // 2
 
-# THRESHOLD_FORWARD = 100.0
-# THRESHOLD_LEFT = 0.5
-# THRESHOLD_RIGHT = 1.5
-# THRESHOLD_BACKWARD = 0.0
+THRESHOLD_FORWARD = 100.0
+THRESHOLD_LEFT = 0.5
+THRESHOLD_RIGHT = 1.5
+THRESHOLD_BACKWARD = 0.0
 
-
-def make_filter(low: float, high: float):
-    nyq = 0.5 * SAMPLE_RATE
-    sos = butter(4, [low/nyq, high/nyq], btype='bandpass', output='sos')
-    return sos
-
-
-# Global Variables
-sos_delta = make_filter(0.5, 4)
-sos_alpha = make_filter(8, 13)
-sos_beta = make_filter(13, 30)
-sos_gamma = make_filter(30, 48)
+action_to_serial_num = {
+    "Stop"    : b'0',
+    "Forward" : b'1',
+    "Left"    : b'4',
+    "Right"   : b'3',
+    "Backward": b'2'
+}
 
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
 
@@ -88,6 +82,18 @@ def read_eeg(inlet: StreamInlet):
             eeg_buffer[:, -1] = sample_np
 
 
+def get_band_power(psd, freq_axis, low, high):
+    """
+    psd: Power Spectral Density (已經平均過頻道的)
+    freq_axis: 頻率軸
+    low, high: 頻帶範圍
+    """
+
+    idx = np.logical_and(freq_axis >= low, freq_axis <= high)
+    
+    return np.sum(psd[idx])
+
+
 def main():
     print("Real-time Control Started!")
     print("Normal    : Stop")
@@ -96,24 +102,46 @@ def main():
     print("Chew      : Right")
     print("Move eyes : Backward")
 
-    actions = []
-    '''
+    # ======== 預先計算 FFT 相關參數 ========
+    # 頻率軸 (0, 1, 2, ..., 500 Hz)
+    freqs = np.fft.rfftfreq(BUFFER_SIZE, d=1/SAMPLE_RATE)
+
+    # 窗函數 (Hanning Window)，用於減少頻譜洩漏
+    # 形狀需為 (1, BUFFER_SIZE) 以便與 eeg_buffer (2, BUFFER_SIZE) 相乘
+    window = np.hanning(BUFFER_SIZE).reshape(1, -1)
+
+    actions = ["Stop" for _ in range(ACTION_BUFFER_SIZE)]
+
+    while np.abs(eeg_buffer[0, 0]) < 1e-6:
+        sleep(0.1)
+
     while True:
-        if np.abs(eeg_buffer[0, 0]) < 1e-6:
-            sleep(0.1)
-            continue
+        # ====== 1. 預處理：去直流 (Demean) 與 加窗 (Windowing) ======
+        # 去除 DC offset (平均值)，避免 0Hz 能量過大
+        data_detrend = eeg_buffer - np.mean(eeg_buffer, axis=1, keepdims=True)
+        # 乘上窗函數
+        data_windowed = data_detrend * window
 
-        # Filter
-        delta_wave = sosfilt(sos_delta, eeg_buffer, axis=1)
-        alpha_wave = sosfilt(sos_alpha, eeg_buffer, axis=1)
-        beta_wave  = sosfilt(sos_beta , eeg_buffer, axis=1)
-        gamma_wave = sosfilt(sos_gamma, eeg_buffer, axis=1)
+        # ====== 2. FFT 運算 ======
+        # rfft: Real FFT (只計算正頻率部分)
+        fft_vals = np.fft.rfft(data_windowed, axis=1)
+        
+        # 計算功率譜 (PSD)
+        # 取絕對值(振幅) -> 平方 -> 除以長度(正規化)
+        # 這裡簡單用 |FFT|^2 / N 即可代表相對能量強度
+        psd = (np.abs(fft_vals) ** 2) / BUFFER_SIZE
+        
+        # 將兩個頻道的能量平均 (O1 和 O2 平均)
+        avg_psd = np.mean(psd, axis=0)
 
-        # Compute power
-        alpha_power = np.mean(alpha_wave ** 2)  # type: ignore
-        gamma_power = np.mean(gamma_wave ** 2)  # type: ignore
-        Fp1_power = np.mean(eeg_buffer[0])
-        Fp2_power = np.mean(eeg_buffer[1])
+        # ====== 3. 提取頻帶能量 ======
+        delta_power = get_band_power(avg_psd, freqs,  1,  4)
+        alpha_power = get_band_power(avg_psd, freqs,  8, 13)
+        beta_power  = get_band_power(avg_psd, freqs, 13, 30)
+        gamma_power = get_band_power(avg_psd, freqs, 30, 48)
+        # Fp1 & Fp2 power
+        Fp1_power = np.mean(np.abs(eeg_buffer[0]) ** 2)
+        Fp2_power = np.mean(np.abs(eeg_buffer[1]) ** 2)
 
         # Determine action
         action = "Stop"
@@ -126,39 +154,29 @@ def main():
         elif gamma_power > THRESHOLD_BACKWARD:
             action = "Backward"
 
-        # Sliding window smoothing
+        # Update action queue
+        actions.pop(0)
         actions.append(action)
-        if len(actions) > ACTION_BUFFER_SIZE:
-            actions.pop(0)
 
         # Action appear most & its count
-        counts = {action: actions.count(action) for action in set(actions)}
+        counts = [(action, actions.count(action)) for action in set(actions)]
         smooth_action = "Stop"
         action_count = 0
-        for action, cnt in counts:
+        for act, cnt in counts:
             if cnt > action_count:
-                smooth_action = action
+                smooth_action = act
                 action_count = cnt
 
         # Determine output
-        if action_count < len(actions) // 2:
-            smooth_action = "Stop"
+        if action_count < MIN_VOTES:
+            ser.write(action_to_serial_num.get("Stop", b'0'))
             print("Votes < 50% -> Stop")
+        else:
+            ser.write(action_to_serial_num.get(smooth_action, b'0'))
+            print(f"Action: {smooth_action} | alpha={alpha_power:10.0f}, gamma={gamma_power:10.0f}, Fp1*Fp2={Fp1_power * Fp2_power:15.0f}")
 
-        if smooth_action == "Forward":
-            ser.write(b'1')
-        elif smooth_action == "Left":
-            ser.write(b'4')
-        elif smooth_action == "Right":
-            ser.write(b'3')
-        elif smooth_action == "Backward":
-            ser.write(b'2')
-        elif smooth_action == "Stop":
-            ser.write(b'0')
-
-        print(f"Action: {smooth_action} | alpha={alpha_power:.2f} gamma={gamma_power:.2f}")
         sleep(0.2)
-    '''
+
 
 if __name__ == "__main__":
     import argparse
