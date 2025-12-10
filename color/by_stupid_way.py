@@ -19,6 +19,8 @@ ACTION_WINDOW_SIZE = 5  # 保留window次數 size=5 ---> 1s
 mode_keep_time = 5 # ---> 5s
 
 
+discrete_time = 0.4
+
 # ======== threshold ========
 THRESHOLD_FORWARD = 10000.0   #  α power
 
@@ -98,7 +100,9 @@ def main():
     display.start()
 
     mode_list = ["Forward", "Left", "Right"]
+    mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
     current_mode = "Forward"
+    current_color = "#00ff15"
 
     current_time = 0.0
     step_time = float(len(mode_list)) * mode_keep_time
@@ -113,11 +117,14 @@ def main():
         
         # ====== 0. mode display ======
 
-        current_mode = mode_list[int(current_time // mode_keep_time)]
+        md_idx = int(current_time // mode_keep_time)
+
+        current_mode = mode_list[md_idx]
+        current_color = mode_color_list[md_idx]
 
 
         display.update_time(current_time)
-        display.update_mode(current_mode)
+        display.update_mode(current_mode, current_color)
 
 
         # ====== 1. preprocess ======
@@ -179,12 +186,16 @@ def main():
         # ====== 6. Serial output ======
         
         if IF_SERIAL:
+
+            discrete_time += 0.2
+
             if smooth_action == "Forward": 
                 ser.write(b'1')
             elif smooth_action == "Left": 
                 ser.write(b'3')
             elif smooth_action == "Right": 
                 ser.write(b'4')
+                
             elif smooth_action == "Stop": 
                 ser.write(b'0')
         
