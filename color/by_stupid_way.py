@@ -99,9 +99,12 @@ def main():
 
     mode_list = ["Forward", "Left", "Right"]
     current_mode = "Forward"
+    past_mode = "Stop"
 
     current_time = 0.0
+    mode_time = 0.0
     step_time = float(len(mode_list)) * mode_keep_time
+    IF_STOP = True
 
     
     while True:
@@ -114,7 +117,9 @@ def main():
         # ====== 0. mode display ======
 
         current_mode = mode_list[int(current_time // mode_keep_time)]
-
+        if current_mode != past_mode:
+            IF_STOP = False
+        past_mode = current_mode
 
         display.update_time(current_time)
         display.update_mode(current_mode)
@@ -142,12 +147,9 @@ def main():
         avg_psd = np.mean(psd, axis=0)
 
 
-
-
         # ====== 3. get_band_power ======
         alpha_power = get_band_power(avg_psd, 8, 13)
-        
-
+    
 
         # ====== 4. action ======
         action = "Stop"
@@ -157,8 +159,6 @@ def main():
 
         else:
             action = "Stop"
-
-
 
         # ====== 5. Sliding window ======
         action_window.append(action)
@@ -177,17 +177,24 @@ def main():
 
 
         # ====== 6. Serial output ======
-        
         if IF_SERIAL:
-            if smooth_action == "Forward": 
-                ser.write(b'1')
-            elif smooth_action == "Left": 
-                ser.write(b'3')
-            elif smooth_action == "Right": 
-                ser.write(b'4')
-            elif smooth_action == "Stop": 
+            if not IF_STOP:
+                if smooth_action == "Forward": 
+                    ser.write(b'1')
+                    mode_time += 0.2
+                elif smooth_action == "Left": 
+                    ser.write(b'3')
+                    mode_time += 0.2
+                elif smooth_action == "Right": 
+                    ser.write(b'4')
+                    mode_time += 0.2
+                elif smooth_action == "Stop": 
+                    ser.write(b'0')
+                
+                if mode_time >= 0.4:
+                    IF_STOP = True
+            else:
                 ser.write(b'0')
-        
 
         print(f"Act: {smooth_action} | α={alpha_power:.1f}")
 
