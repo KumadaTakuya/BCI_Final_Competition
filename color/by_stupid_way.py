@@ -26,7 +26,7 @@ THRESHOLD_FORWARD = 10000.0   #  α power
 
 #  ======== serial 設定 ========
 if IF_SERIAL:
-    ser = serial.Serial("COM3", 9600, timeout=10, write_timeout=10)
+    ser = serial.Serial("COM11", 9600, timeout=10, write_timeout=10)
 
 
 
@@ -113,7 +113,7 @@ def main():
         
         # ====== 0. mode display ======
 
-        current_mode = mode_list[current_time // mode_keep_time]
+        current_mode = mode_list[int(current_time // mode_keep_time)]
 
 
         display.update_time(current_time)
@@ -145,7 +145,7 @@ def main():
 
 
         # ====== 3. get_band_power ======
-        alpha_power = get_band_power(avg_psd, freqs, 8, 13)
+        alpha_power = get_band_power(avg_psd, 8, 13)
         
 
 
@@ -182,9 +182,9 @@ def main():
             if smooth_action == "Forward": 
                 ser.write(b'1')
             elif smooth_action == "Left": 
-                ser.write(b'4')
-            elif smooth_action == "Right": 
                 ser.write(b'3')
+            elif smooth_action == "Right": 
+                ser.write(b'4')
             elif smooth_action == "Stop": 
                 ser.write(b'0')
         
@@ -197,6 +197,10 @@ def main():
 
         current_time += 0.2
 
+        if smooth_action == current_mode:
+            current_time -= 0.2
+
+        
         if current_time >= step_time:
             current_time -= step_time
 
