@@ -6,7 +6,7 @@ import serial
 import mode_display as MD
 
 # ======== adjust para ==============
-IF_SERIAL = False
+IF_SERIAL = True
 
 
 # Fp1=0, Fp2=1, O1=4, O2=5
@@ -98,7 +98,9 @@ def main():
     display.start()
 
     mode_list = ["Forward", "Left", "Right"]
+    mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
     current_mode = "Forward"
+    current_color = "#00ff15"
     past_mode = "Stop"
 
     current_time = 0.0
@@ -116,13 +118,21 @@ def main():
         
         # ====== 0. mode display ======
 
-        current_mode = mode_list[int(current_time // mode_keep_time)]
+        md_idx = int(current_time // mode_keep_time)
+
+        current_mode = mode_list[md_idx]
+        current_color = mode_color_list[md_idx]
+        
+        
         if current_mode != past_mode:
+            mode_time = 0.0
             IF_STOP = False
+            action_window.clear()
+
         past_mode = current_mode
 
         display.update_time(current_time)
-        display.update_mode(current_mode)
+        display.update_mode(current_mode, current_color)
 
 
         # ====== 1. preprocess ======
@@ -177,6 +187,24 @@ def main():
 
 
         # ====== 6. Serial output ======
+        """
+        if not IF_STOP:
+            if smooth_action == "Forward":
+                mode_time += 0.2
+            elif smooth_action == "Left": 
+                mode_time += 0.2
+            elif smooth_action == "Right": 
+                mode_time += 0.2
+            elif smooth_action == "Stop":
+                a = 0
+
+            if mode_time >= 0.4:
+                IF_STOP = True
+        else:
+            smooth_action = "Stop"
+            print("IF_STOP is true")
+        """
+
         if IF_SERIAL:
             if not IF_STOP:
                 if smooth_action == "Forward": 
@@ -191,9 +219,12 @@ def main():
                 elif smooth_action == "Stop": 
                     ser.write(b'0')
                 
-                if mode_time >= 0.4:
+                if mode_time >= 0.2:
                     IF_STOP = True
+                    ser.write(b'0')
             else:
+                smooth_action = "Stop"
+                print("IF_STOP is true")
                 ser.write(b'0')
 
         print(f"Act: {smooth_action} | α={alpha_power:.1f}")
