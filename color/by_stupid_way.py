@@ -16,10 +16,18 @@ CHANNEL_COUNT = len(CHANNEL_IDX)
 
 ACTION_WINDOW_SIZE = 5  # 保留window次數 size=5 ---> 1s
 
-mode_keep_time = 5 # ---> 5s
+mode_keep_time = 5.0 # ---> 5s
 
 
-discrete_time = 0.4
+# ======== speed adjust =========
+
+## S ---> forward, T ---> rota
+## ori speedS = 10, speedT = 10
+ # if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT
+
+add_speedS = -5
+add_speedT = -5
+
 
 # ======== threshold ========
 THRESHOLD_FORWARD = 10000.0   #  α power
@@ -86,6 +94,65 @@ def get_band_power(psd, low, high):
 
 
 
+# ======== adjust_speed ========
+
+
+def adj(add_speed, add_order, minus_order):
+
+    if add_speed > 0:
+        adj_order = add_order
+    else:
+        adj_order = minus_order
+
+    for i in range(np.abs(add_speed)):
+        ser.write(adj_order)
+        time.sleep(0.2)
+
+
+    # back to stop
+    ser.write(b'0')
+    time.sleep(0.2)
+
+
+def adjust_speed():
+    """
+    ## speedS ---> forward, speedT ---> rota
+    ## ori speedS = 10, speedT = 10
+
+    b'5' --> speedS+1
+    b'6' --> speedS-1
+    b'7' --> speedT+1
+    b'8' --> speedT-1
+
+    """
+
+    print("Start adjust speed, ori speedS = 10, speedT = 10")
+
+    print("if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT")
+
+    global add_speedS
+    global add_speedT
+    
+    adj(add_speedS, add_order = b'5', minus_order = b'6')
+    adj(add_speedT, add_order = b'7', minus_order = b'8')
+
+    print(f"add_speedS: {add_speedS} | add_speedT: {add_speedT}")
+    
+
+    # if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT
+
+    spS = np.clip(10 + add_speedS, 0, 10)
+    spT = np.clip(10 + add_speedT, 0, 10)
+
+    print(f"Final:  speedS: {spS} |  speedT: {spT}")
+
+    
+    
+
+
+    
+
+
 
 # ======== MAIN  ============
 def main():
@@ -102,10 +169,14 @@ def main():
     mode_list = ["Forward", "Left", "Right"]
     mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
     current_mode = "Forward"
-    current_color = "#00ff15"
+    current_color = "#04d616"
 
     current_time = 0.0
-    step_time = float(len(mode_list)) * mode_keep_time
+    total_mode_time = len(mode_list) * float(mode_keep_time)
+
+
+    if IF_SERIAL:
+        adjust_speed()
 
     
     while True:
@@ -187,8 +258,6 @@ def main():
         
         if IF_SERIAL:
 
-            discrete_time += 0.2
-
             if smooth_action == "Forward": 
                 ser.write(b'1')
             elif smooth_action == "Left": 
@@ -212,8 +281,8 @@ def main():
             current_time -= 0.2
 
         
-        if current_time >= step_time:
-            current_time -= step_time
+        if current_time >= total_mode_time:
+            current_time -= total_mode_time
 
 
         time.sleep(0.2)
