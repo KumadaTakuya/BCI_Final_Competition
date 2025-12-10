@@ -6,6 +6,7 @@ class TimeDisplay:
     def __init__(self):
         self.current_time = 0.0
         self.current_mode = "Forward"
+        self.current_color = "green"
         self.window = None
         self.time_label = None
         self.mode_label = None
@@ -57,16 +58,17 @@ class TimeDisplay:
         """定期檢查並更新顯示"""
         if self.time_label and self.mode_label and self.running:
             self.time_label.config(text=f"{self.current_time:.1f}")
-            self.mode_label.config(text=self.current_mode)
+            self.mode_label.config(text=self.current_mode, fg=self.current_color)
             self.window.after(50, self.check_update)  # 每 50ms 檢查一次
     
     def update_time(self, new_time):
         """從主程式更新時間"""
         self.current_time = new_time
     
-    def update_mode(self, new_mode):
+    def update_mode(self, new_mode, new_color):
         """從主程式更新模式"""
         self.current_mode = new_mode
+        self.current_color = new_color
     
     def on_closing(self):
         """關閉視窗時的處理"""
@@ -90,13 +92,14 @@ if __name__ == "__main__":
     # 你的主程式迴圈
     current_time = 0.0
     current_mode = "Forward"
+    current_color = "#00ff55"
     
     while True:
         current_time += 0.2
         
         # 更新視窗顯示
         display.update_time(current_time)
-        display.update_mode(current_mode)
+        display.update_mode(current_mode, current_color)
         
         # === 你的其他功能在這裡 ===
         print(f"執行中... {current_time:.1f}秒 - 模式: {current_mode}")
