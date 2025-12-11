@@ -6,8 +6,8 @@ import serial
 import mode_display as MD
 
 # ======== adjust para ==============
-IF_SERIAL = False
-
+IF_SERIAL = True
+ADJ_SPD = True
 
 # Fp1=0, Fp2=1, O1=4, O2=5
 CHANNEL_IDX = [4, 5]
@@ -25,8 +25,8 @@ mode_keep_time = 5.0 # ---> 5s
 ## ori speedS = 10, speedT = 10
  # if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT
 
-add_speedS = -5
-add_speedT = -5
+add_speedS = 10
+add_speedT = 10
 
 
 # ======== threshold ========
@@ -36,7 +36,7 @@ THRESHOLD_FORWARD = 10000.0   #  α power
 
 #  ======== serial 設定 ========
 if IF_SERIAL:
-    ser = serial.Serial("COM11", 9600, timeout=10, write_timeout=10)
+    ser = serial.Serial("COM12", 9600, timeout=10, write_timeout=10)
 
 
 
@@ -147,7 +147,32 @@ def adjust_speed():
     print(f"Final:  speedS: {spS} |  speedT: {spT}")
 
     
+def reset_speed():
+    """
+    ## speedS ---> forward, speedT ---> rota
+    ## ori speedS = 10, speedT = 10
+
+    b'5' --> speedS+1
+    b'6' --> speedS-1
+    b'7' --> speedT+1
+    b'8' --> speedT-1
+
+    """
+
+    print("reset_speed speedS = 10, speedT = 10")
+
+    print("if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT")
+
+    global add_speedS
+    global add_speedT
     
+    adj(-add_speedS, add_order = b'5', minus_order = b'6')
+    adj(-add_speedT, add_order = b'7', minus_order = b'8')
+
+    print(f"add_speedS: {-add_speedS} | add_speedT: {-add_speedT}")
+    
+    print(f"Reset finish")
+
 
 
     
@@ -176,7 +201,8 @@ def main():
 
 
     if IF_SERIAL:
-        adjust_speed()
+        if ADJ_SPD:
+            adjust_speed()
 
     
     while True:
