@@ -16,7 +16,7 @@ CHANNEL_COUNT = len(CHANNEL_IDX)
 
 ACTION_WINDOW_SIZE = 5  # 保留window次數 size=5 ---> 1s
 
-mode_keep_time = 5.0 # ---> 5s
+mode_keep_time = 25 # ---> 5s = 25/5
 
 
 # ======== speed adjust =========
@@ -189,7 +189,7 @@ def main():
         
         # ====== 0. mode display ======
 
-        if (int(current_time // mode_keep_time) == md_idx):
+        if (int(current_time // mode_keep_time) == 0):
             if not isAlreadyMove:
                 md_idx = (md_idx + 1) % len(mode_list)
                 current_mode = mode_list[md_idx]
@@ -302,7 +302,7 @@ def main():
 
         # ====== 7. time adjust ======
 
-        current_time += 0.2
+        current_time += 1
 
         # if smooth_action == current_mode:
         #     current_time -= 0.2
