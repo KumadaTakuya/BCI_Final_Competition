@@ -6,7 +6,7 @@ import serial
 import mode_display as MD
 
 # ======== adjust para ==============
-IF_SERIAL = True
+IF_SERIAL = False
 
 
 # Fp1=0, Fp2=1, O1=4, O2=5
@@ -25,8 +25,8 @@ mode_keep_time = 5.0 # ---> 5s
 ## ori speedS = 10, speedT = 10
  # if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT
 
-add_speedS = -5
-add_speedT = -5
+add_speedS = 0
+add_speedT = 0
 
 
 # ======== threshold ========
@@ -171,7 +171,7 @@ def main():
     current_time = 0.0
     mode_time = 0.0
     total_mode_time = len(mode_list) * float(mode_keep_time)
-    md_idx = 0
+    md_idx = -1
     
     step_time = float(len(mode_list)) * mode_keep_time
     isAlreadyMove = True
@@ -304,12 +304,12 @@ def main():
 
         current_time += 0.2
 
-        if smooth_action == current_mode:
-            current_time -= 0.2
+        # if smooth_action == current_mode:
+        #     current_time -= 0.2
 
         
-        if current_time >= total_mode_time:
-            current_time -= total_mode_time
+        # if current_time >= total_mode_time:
+        #     current_time -= total_mode_time
 
 
         time.sleep(0.2)
