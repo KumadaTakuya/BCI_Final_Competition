@@ -32,7 +32,7 @@ BUFFER_SIZE = 1000  # 1s
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
 
 
-def setup_lsl_inlet(stream_name="") -> StreamInlet:
+def setup_lsl_inlet(stream_name: str) -> StreamInlet:
     print("Resolving streams...")
     streams = resolve_streams()
     if not streams:
@@ -67,16 +67,62 @@ def read_eeg(inlet: StreamInlet):
             eeg_buffer[:, -1] = sample_np
 
 
+def get_band_power(psd, freq_axis, low, high):
+    """
+    psd: Power Spectral Density (已經平均過頻道的)
+    freq_axis: 頻率軸
+    low, high: 頻帶範圍
+    """
+
+    idx = np.logical_and(freq_axis >= low, freq_axis <= high)
+    
+    return np.sum(psd[idx])
+
+
 def main():
+    # ======== 預先計算 FFT 相關參數 ========
+    # 頻率軸 (0, 1, 2, ..., 500 Hz)
+    freqs = np.fft.rfftfreq(BUFFER_SIZE, d=1/SAMPLE_RATE)
+
+    # 窗函數 (Hanning Window)，用於減少頻譜洩漏
+    # window = np.hanning(500)
+    n = np.arange(BUFFER_SIZE)
+    window = 0.5 * (1 - np.cos(np.pi * n / (BUFFER_SIZE - 1)))
+
     while np.abs(eeg_buffer[0, 0]) < 1e-6:
         sleep(0.1)
 
     while True:
-        Fp1_power = np.mean(np.abs(eeg_buffer[0]) ** 2)
-        Fp2_power = np.mean(np.abs(eeg_buffer[1]) ** 2)
-        O1_power  = np.mean(np.abs(eeg_buffer[2]) ** 2)
-        O2_power  = np.mean(np.abs(eeg_buffer[3]) ** 2)
+        # ====== 1. 預處理：去直流 (Demean) 與 加窗 (Windowing) ======
+        # 去除 DC offset (平均值)，避免 0Hz 能量過大
+        data_detrend = eeg_buffer - np.mean(eeg_buffer, axis=1, keepdims=True)
+        # 乘上窗函數
+        data_windowed = data_detrend * window
 
+        # ====== 2. FFT 運算 ======
+        # Real FFT
+        fft_vals = np.fft.rfft(data_windowed, axis=1)
+        
+        # 計算功率譜 (PSD)
+        # 取絕對值(振幅) -> 平方 -> 除以長度(正規化)
+        # 這裡簡單用 |FFT|^2 / N 即可代表相對能量強度
+        psd = (np.abs(fft_vals) ** 2) / BUFFER_SIZE
+        
+        # 將頻道的能量平均
+        avg_psd = np.mean(psd, axis=0)
+
+        # ====== 3. 提取頻帶能量 ======
+        delta_power = get_band_power(avg_psd, freqs,  1,  4)
+        alpha_power = get_band_power(avg_psd, freqs,  8, 13)
+        beta_power  = get_band_power(avg_psd, freqs, 13, 30)
+        gamma_power = get_band_power(avg_psd, freqs, 30, 48)
+        # Fp1 & Fp2 power
+        Fp1_power = np.mean(np.abs(data_detrend[0]) ** 2)
+        Fp2_power = np.mean(np.abs(data_detrend[1]) ** 2)
+        O1_power  = np.mean(np.abs(data_detrend[2]) ** 2)
+        O2_power  = np.mean(np.abs(data_detrend[3]) ** 2)
+
+        print(f"alpha: {alpha_power:10.0f}, beta: {beta_power:10.0f}, gamma: {gamma_power:10.0f}, delta: {delta_power:10.0f}")
         print(f"Fp1: {Fp1_power:10.0f}, Fp2: {Fp2_power:10.0f}, O1: {O1_power:10.0f}, O2: {O2_power:10.0f}")
         sleep(0.2)
 

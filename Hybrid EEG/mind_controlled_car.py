@@ -31,7 +31,7 @@ BUFFER_SIZE = 1000  # 1s
 ACTION_BUFFER_SIZE = 5
 MIN_VOTES = ACTION_BUFFER_SIZE // 2
 
-THRESHOLD_FORWARD = 100.0
+THRESHOLD_FORWARD = 100.0  # TODO: modify the threshold values
 THRESHOLD_LEFT = 0.5
 THRESHOLD_RIGHT = 1.5
 THRESHOLD_BACKWARD = 0.0
@@ -47,7 +47,7 @@ action_to_serial_num = {
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
 
 
-def setup_lsl_inlet(stream_name="") -> StreamInlet:
+def setup_lsl_inlet(stream_name: str) -> StreamInlet:
     print("Resolving streams...")
     streams = resolve_streams()
     if not streams:
@@ -107,8 +107,9 @@ def main():
     freqs = np.fft.rfftfreq(BUFFER_SIZE, d=1/SAMPLE_RATE)
 
     # 窗函數 (Hanning Window)，用於減少頻譜洩漏
-    # 形狀需為 (1, BUFFER_SIZE) 以便與 eeg_buffer (2, BUFFER_SIZE) 相乘
-    window = np.hanning(BUFFER_SIZE).reshape(1, -1)
+    # window = np.hanning(500)
+    n = np.arange(BUFFER_SIZE)
+    window = 0.5 * (1 - np.cos(np.pi * n / (BUFFER_SIZE - 1)))
 
     actions = ["Stop" for _ in range(ACTION_BUFFER_SIZE)]
 
@@ -123,7 +124,7 @@ def main():
         data_windowed = data_detrend * window
 
         # ====== 2. FFT 運算 ======
-        # rfft: Real FFT (只計算正頻率部分)
+        # Real FFT
         fft_vals = np.fft.rfft(data_windowed, axis=1)
         
         # 計算功率譜 (PSD)
@@ -131,7 +132,7 @@ def main():
         # 這裡簡單用 |FFT|^2 / N 即可代表相對能量強度
         psd = (np.abs(fft_vals) ** 2) / BUFFER_SIZE
         
-        # 將兩個頻道的能量平均 (O1 和 O2 平均)
+        # 將頻道的能量平均
         avg_psd = np.mean(psd, axis=0)
 
         # ====== 3. 提取頻帶能量 ======
@@ -140,8 +141,8 @@ def main():
         beta_power  = get_band_power(avg_psd, freqs, 13, 30)
         gamma_power = get_band_power(avg_psd, freqs, 30, 48)
         # Fp1 & Fp2 power
-        Fp1_power = np.mean(np.abs(eeg_buffer[0]) ** 2)
-        Fp2_power = np.mean(np.abs(eeg_buffer[1]) ** 2)
+        Fp1_power = np.mean(np.abs(data_detrend[0]) ** 2)
+        Fp2_power = np.mean(np.abs(data_detrend[1]) ** 2)
 
         # Determine action
         action = "Stop"
