@@ -276,7 +276,6 @@ def main():
                 if mode_time >= 2:
                     isAlreadyMove = True
             else:
-                smooth_action = "Stop"
                 print("isAlreadyMove is true")
                 ser.write(b'0')
         else:
@@ -293,7 +292,6 @@ def main():
                 if mode_time >= 2:
                     isAlreadyMove = True
             else:
-                smooth_action = "Stop"
                 print("isAlreadyMove is true")
 
         print(f"Act: {smooth_action} | α={alpha_power:.1f}")
