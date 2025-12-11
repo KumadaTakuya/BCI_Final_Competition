@@ -2,7 +2,7 @@ from pylsl import StreamInlet, resolve_streams
 import numpy as np
 # from serial import Serial
 from time import sleep
-from threading import Thread
+from threading import Thread, Lock
 
 
 """
@@ -30,6 +30,8 @@ CHANNEL_COUNT = 4
 BUFFER_SIZE = 1000  # 1s
 
 eeg_buffer = np.zeros((CHANNEL_COUNT, BUFFER_SIZE))
+write_idx = 0
+lock = Lock()
 
 
 def setup_lsl_inlet(stream_name: str) -> StreamInlet:
@@ -56,15 +58,45 @@ def setup_lsl_inlet(stream_name: str) -> StreamInlet:
 
 
 def read_eeg(inlet: StreamInlet):
-    global eeg_buffer
+    global eeg_buffer, write_idx
     while True:
-        sample, timestamp = inlet.pull_sample()
-        if sample:
-            selected_data = [sample[FP1], sample[FP2], sample[O1], sample[O2]]
-            sample_np = np.array(selected_data).reshape(-1)
+        chunk, ts = inlet.pull_chunk(max_samples=32)
+        if not chunk:
+            continue
+        data = np.array(chunk).T   # shape: (channels, n_samples)
+        n = data.shape[1]
+        B = BUFFER_SIZE
 
-            eeg_buffer[:, :-1] = eeg_buffer[:, 1:]
-            eeg_buffer[:, -1] = sample_np
+        with lock:
+            end = write_idx + n
+            if end <= B:
+                eeg_buffer[:, write_idx:end] = data
+            else:
+                part1 = B - write_idx
+                eeg_buffer[:, write_idx:] = data[:, :part1]
+                eeg_buffer[:, :n - part1] = data[:, part1:]
+
+            write_idx = (write_idx + n) % B
+
+
+def read_last(N: int):
+    global eeg_buffer, write_idx
+    B = BUFFER_SIZE
+    if N > B:
+        raise ValueError("N > buffer size.")
+    
+    with lock:
+        start = (write_idx + B - N) % B
+        if start < write_idx:  # contiguous
+            return eeg_buffer[:, start:write_idx].copy()
+        else:  # wrapped
+            return np.hstack((eeg_buffer[:, start:], eeg_buffer[:, :write_idx])).copy()
+
+
+def read_all():
+    global eeg_buffer, write_idx
+    with lock:
+        return np.hstack((eeg_buffer[:, write_idx:], eeg_buffer[:, :write_idx])).copy()
 
 
 def get_band_power(psd, freq_axis, low, high):
@@ -89,13 +121,14 @@ def main():
     n = np.arange(BUFFER_SIZE)
     window = 0.5 * (1 - np.cos(np.pi * n / (BUFFER_SIZE - 1)))
 
-    while np.abs(eeg_buffer[0, 0]) < 1e-6:
+    while np.abs(eeg_buffer[0, -1]) < 1e-6:
         sleep(0.1)
 
     while True:
+        data = read_all()
         # ====== 1. 預處理：去直流 (Demean) 與 加窗 (Windowing) ======
         # 去除 DC offset (平均值)，避免 0Hz 能量過大
-        data_detrend = eeg_buffer - np.mean(eeg_buffer, axis=1, keepdims=True)
+        data_detrend = data - np.mean(data, axis=1, keepdims=True)
         # 乘上窗函數
         data_windowed = data_detrend * window
 
@@ -114,16 +147,17 @@ def main():
         # ====== 3. 提取頻帶能量 ======
         delta_power = get_band_power(avg_psd, freqs,  1,  4)
         alpha_power = get_band_power(avg_psd, freqs,  8, 13)
-        beta_power  = get_band_power(avg_psd, freqs, 13, 30)
-        gamma_power = get_band_power(avg_psd, freqs, 30, 48)
-        # Fp1 & Fp2 power
-        Fp1_power = np.mean(np.abs(data_detrend[0]) ** 2)
-        Fp2_power = np.mean(np.abs(data_detrend[1]) ** 2)
-        O1_power  = np.mean(np.abs(data_detrend[2]) ** 2)
-        O2_power  = np.mean(np.abs(data_detrend[3]) ** 2)
+        beta_gamma_power  = get_band_power(avg_psd, freqs, 13, 48)
+        # Left: Blink, Right: Move eyes
+        Fp1_max = np.max(data_detrend[0, 400:])
+        Fp1_min = np.min(data_detrend[0, 400:])
+        Fp1_diff = Fp1_max - Fp1_min
+        Fp2_max = np.max(data_detrend[1, 400:])
+        Fp2_min = np.min(data_detrend[1, 400:])
+        Fp2_diff = Fp2_max - Fp2_min
 
-        print(f"alpha: {alpha_power:10.0f}, beta: {beta_power:10.0f}, gamma: {gamma_power:10.0f}, delta: {delta_power:10.0f}")
-        print(f"Fp1: {Fp1_power:10.0f}, Fp2: {Fp2_power:10.0f}, O1: {O1_power:10.0f}, O2: {O2_power:10.0f}")
+        print(f"a={alpha_power:8.0f}, b&g={beta_gamma_power:8.0f}, Fp1={Fp1_max:10.6f} - {Fp1_min:10.6f} = {Fp1_diff:10.6f}, Fp2={Fp2_max:10.6f} - {Fp2_min:10.6f} = {Fp2_diff:10.6f}")
+
         sleep(0.2)
 
 
