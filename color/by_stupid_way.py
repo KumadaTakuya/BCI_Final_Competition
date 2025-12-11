@@ -147,12 +147,6 @@ def adjust_speed():
     print(f"Final:  speedS: {spS} |  speedT: {spT}")
 
     
-    
-
-
-    
-
-
 
 # ======== MAIN  ============
 def main():
@@ -177,17 +171,14 @@ def main():
     current_time = 0.0
     mode_time = 0.0
     total_mode_time = len(mode_list) * float(mode_keep_time)
+    md_idx = 0
     
     step_time = float(len(mode_list)) * mode_keep_time
-    IF_STOP = True
+    isAlreadyMove = True
 
 
     if IF_SERIAL:
         adjust_speed()
-    
-    
-
-
     
     while True:
 
@@ -198,18 +189,17 @@ def main():
         
         # ====== 0. mode display ======
 
-        md_idx = int(current_time // mode_keep_time)
+        if (int(current_time // mode_keep_time) == md_idx):
+            if not isAlreadyMove:
+                md_idx = (md_idx + 1) % len(mode_list)
+                current_mode = mode_list[md_idx]
+                current_color = mode_color_list[md_idx]
 
-        current_mode = mode_list[md_idx]
-        current_color = mode_color_list[md_idx]
-        
-        
-        if current_mode != past_mode:
+            isAlreadyMove = False
             mode_time = 0.0
-            IF_STOP = False
             action_window.clear()
 
-        past_mode = current_mode
+
 
         display.update_time(current_time)
         display.update_mode(current_mode, current_color)
@@ -269,25 +259,7 @@ def main():
         # ====== 6. Serial output ======
 
         if IF_SERIAL:
-            if not IF_STOP:
-                if smooth_action == "Forward":
-                    mode_time += 0.2
-                elif smooth_action == "Left": 
-                    mode_time += 0.2
-                elif smooth_action == "Right": 
-                    mode_time += 0.2
-                elif smooth_action == "Stop":
-                    a = 0
-
-                if mode_time >= 0.4:
-                    IF_STOP = True
-            else:
-                smooth_action = "Stop"
-                print("IF_STOP is true")
-        
-
-        if IF_SERIAL:
-            if not IF_STOP:
+            if not isAlreadyMove:
                 if smooth_action == "Forward": 
                     ser.write(b'1')
                     mode_time += 0.2
@@ -301,12 +273,28 @@ def main():
                     ser.write(b'0')
                 
                 if mode_time >= 0.2:
-                    IF_STOP = True
+                    isAlreadyMove = True
                     ser.write(b'0')
             else:
                 smooth_action = "Stop"
-                print("IF_STOP is true")
+                print("isAlreadyMove is true")
                 ser.write(b'0')
+        else:
+            if not isAlreadyMove:
+                if smooth_action == "Forward":
+                    mode_time += 0.2
+                elif smooth_action == "Left": 
+                    mode_time += 0.2
+                elif smooth_action == "Right": 
+                    mode_time += 0.2
+                elif smooth_action == "Stop":
+                    a = 0
+
+                if mode_time >= 0.2:
+                    isAlreadyMove = True
+            else:
+                smooth_action = "Stop"
+                print("isAlreadyMove is true")
 
         print(f"Act: {smooth_action} | α={alpha_power:.1f}")
 
