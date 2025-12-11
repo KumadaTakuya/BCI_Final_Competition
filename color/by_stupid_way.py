@@ -6,7 +6,7 @@ import serial
 import mode_display as MD
 
 # ======== adjust para ==============
-IF_SERIAL = False
+IF_SERIAL = True
 
 
 # Fp1=0, Fp2=1, O1=4, O2=5
@@ -168,15 +168,25 @@ def main():
 
     mode_list = ["Forward", "Left", "Right"]
     mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
-    current_mode = "Forward"
     current_color = "#04d616"
+    current_mode = "Forward"
+    past_mode = "Stop"
+    
+    
 
     current_time = 0.0
+    mode_time = 0.0
     total_mode_time = len(mode_list) * float(mode_keep_time)
+    
+    step_time = float(len(mode_list)) * mode_keep_time
+    IF_STOP = True
 
 
     if IF_SERIAL:
         adjust_speed()
+    
+    
+
 
     
     while True:
@@ -192,7 +202,14 @@ def main():
 
         current_mode = mode_list[md_idx]
         current_color = mode_color_list[md_idx]
+        
+        
+        if current_mode != past_mode:
+            mode_time = 0.0
+            IF_STOP = False
+            action_window.clear()
 
+        past_mode = current_mode
 
         display.update_time(current_time)
         display.update_mode(current_mode, current_color)
@@ -220,12 +237,9 @@ def main():
         avg_psd = np.mean(psd, axis=0)
 
 
-
-
         # ====== 3. get_band_power ======
         alpha_power = get_band_power(avg_psd, 8, 13)
-        
-
+    
 
         # ====== 4. action ======
         action = "Stop"
@@ -235,8 +249,6 @@ def main():
 
         else:
             action = "Stop"
-
-
 
         # ====== 5. Sliding window ======
         action_window.append(action)
@@ -255,19 +267,46 @@ def main():
 
 
         # ====== 6. Serial output ======
-        
-        if IF_SERIAL:
 
-            if smooth_action == "Forward": 
-                ser.write(b'1')
-            elif smooth_action == "Left": 
-                ser.write(b'3')
-            elif smooth_action == "Right": 
-                ser.write(b'4')
-                
-            elif smooth_action == "Stop": 
-                ser.write(b'0')
+        if IF_SERIAL:
+            if not IF_STOP:
+                if smooth_action == "Forward":
+                    mode_time += 0.2
+                elif smooth_action == "Left": 
+                    mode_time += 0.2
+                elif smooth_action == "Right": 
+                    mode_time += 0.2
+                elif smooth_action == "Stop":
+                    a = 0
+
+                if mode_time >= 0.4:
+                    IF_STOP = True
+            else:
+                smooth_action = "Stop"
+                print("IF_STOP is true")
         
+
+        if IF_SERIAL:
+            if not IF_STOP:
+                if smooth_action == "Forward": 
+                    ser.write(b'1')
+                    mode_time += 0.2
+                elif smooth_action == "Left": 
+                    ser.write(b'3')
+                    mode_time += 0.2
+                elif smooth_action == "Right": 
+                    ser.write(b'4')
+                    mode_time += 0.2
+                elif smooth_action == "Stop": 
+                    ser.write(b'0')
+                
+                if mode_time >= 0.2:
+                    IF_STOP = True
+                    ser.write(b'0')
+            else:
+                smooth_action = "Stop"
+                print("IF_STOP is true")
+                ser.write(b'0')
 
         print(f"Act: {smooth_action} | α={alpha_power:.1f}")
 
