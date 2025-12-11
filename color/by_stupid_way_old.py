@@ -18,8 +18,6 @@ ACTION_WINDOW_SIZE = 5  # 保留window次數 size=5 ---> 1s
 
 mode_keep_time = 5.0 # ---> 5s
 
-dicrete_mode_walk_stamp = 3     # stamp 3 ---> 0.6s
-dicrete_mode_pause_stamp = 5    # stamp 5 ---> 1s
 
 # ======== speed adjust =========
 
@@ -27,8 +25,8 @@ dicrete_mode_pause_stamp = 5    # stamp 5 ---> 1s
 ## ori speedS = 10, speedT = 10
  # if speedS > 10 still keep 10, speedS < 0 still keep 0, same rules on speedT
 
-add_speedS = -7
-add_speedT = -7
+add_speedS = -8
+add_speedT = -8
 
 
 # ======== threshold ========
@@ -167,41 +165,39 @@ def reset_speed():
 
     global add_speedS
     global add_speedT
-
-    print(f"this time add_speedS: {add_speedS} | add_speedT: {add_speedT}")
     
-    adj(10, add_order = b'5', minus_order = b'6')
-    adj(10, add_order = b'7', minus_order = b'8')
+    adj(-add_speedS, add_order = b'5', minus_order = b'6')
+    adj(-add_speedT, add_order = b'7', minus_order = b'8')
 
+    print(f"add_speedS: {-add_speedS} | add_speedT: {-add_speedT}")
+    
     print(f"Reset finish")
 
 
 
     
 
-
+DISCRETE = 0
 
 
 
 # ======== MAIN  ============
 def main():
     global action_window
+    global DISCRETE
 
     print("Realtime Control Started! (FFT Mode)")
     print("Alpha (8-13Hz)")
     
+
 
     display = MD.TimeDisplay()
     display.start()
 
     mode_list = ["Forward", "Left", "Right"]
     mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
-
     current_mode = "Forward"
     current_color = "#04d616"
-
-    prev_mode = "no_prev_mode"
-    
 
     current_time = 0.0
     total_mode_time = len(mode_list) * float(mode_keep_time)
@@ -211,8 +207,7 @@ def main():
         if ADJ_SPD:
             adjust_speed()
 
-    DISCRETE = 0
-
+    
     while True:
 
         if np.abs(eeg_buffer[0, 0]) < 1e-6:
@@ -220,19 +215,9 @@ def main():
             time.sleep(0.1)
             continue
 
-        if prev_mode != current_mode:
+        if DISCRETE >= 3:
             DISCRETE = 0
-
-
-        prev_mode = current_mode
-
-        if DISCRETE >= dicrete_mode_walk_stamp:
-            DISCRETE = 0
-            for i in range(dicrete_mode_pause_stamp):
-
-                #display.update_mode(current_mode, "#d13aff")
-                print("pause")
-
+            for i in range(5):
                 ser.write(b'0')
                 time.sleep(0.2)
 
@@ -381,10 +366,5 @@ if __name__ == "__main__":
         main()
 
     except KeyboardInterrupt:
-
-        if IF_SERIAL:
-            if ADJ_SPD:
-                reset_speed()
-
         print("\nExiting...")
         exit(0)
