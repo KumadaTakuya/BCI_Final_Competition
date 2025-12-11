@@ -36,7 +36,7 @@ THRESHOLD_FORWARD = 10000.0   #  α power
 
 #  ======== serial 設定 ========
 if IF_SERIAL:
-    ser = serial.Serial("COM11", 9600, timeout=10, write_timeout=10)
+    ser = serial.Serial("COM12", 9600, timeout=10, write_timeout=10)
 
 
 
@@ -175,7 +175,7 @@ def main():
     count = 0
     
     step_time = float(len(mode_list)) * mode_keep_time
-    isAlreadyMove = True
+    isAlreadyMove = False
 
 
     if IF_SERIAL:
@@ -263,19 +263,18 @@ def main():
             if not isAlreadyMove:
                 if smooth_action == "Forward": 
                     ser.write(b'1')
-                    mode_time += 0.2
+                    mode_time += 1
                 elif smooth_action == "Left": 
                     ser.write(b'3')
-                    mode_time += 0.2
+                    mode_time += 2
                 elif smooth_action == "Right": 
                     ser.write(b'4')
-                    mode_time += 0.2
+                    mode_time += 2
                 elif smooth_action == "Stop": 
                     ser.write(b'0')
                 
-                if mode_time >= 0.2:
+                if mode_time >= 2:
                     isAlreadyMove = True
-                    ser.write(b'0')
             else:
                 smooth_action = "Stop"
                 print("isAlreadyMove is true")
@@ -283,15 +282,15 @@ def main():
         else:
             if not isAlreadyMove:
                 if smooth_action == "Forward":
-                    mode_time += 0.2
+                    mode_time += 1
                 elif smooth_action == "Left": 
-                    mode_time += 0.2
+                    mode_time += 2
                 elif smooth_action == "Right": 
-                    mode_time += 0.2
+                    mode_time += 2
                 elif smooth_action == "Stop":
                     a = 0
 
-                if mode_time >= 0.2:
+                if mode_time >= 2:
                     isAlreadyMove = True
             else:
                 smooth_action = "Stop"
