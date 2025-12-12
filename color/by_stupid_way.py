@@ -263,7 +263,7 @@ def main():
             if not isAlreadyMove:
                 if smooth_action == "Forward": 
                     ser.write(b'1')
-                    mode_time += 1
+                    mode_time += 2
                 elif smooth_action == "Left": 
                     ser.write(b'3')
                     mode_time += 2
@@ -281,7 +281,7 @@ def main():
         else:
             if not isAlreadyMove:
                 if smooth_action == "Forward":
-                    mode_time += 1
+                    mode_time += 2
                 elif smooth_action == "Left": 
                     mode_time += 2
                 elif smooth_action == "Right": 
