@@ -160,7 +160,7 @@ def main():
     display = MD.TimeDisplay()
     display.start()
 
-    mode_list = ["Forward", "Left", "Right"]
+    mode_list = ["Forward", "Left", "Forward", "Right"]
     mode_color_list = ["#00ff15", "#ff0000", "#ffff00"]
     current_color = "#04d616"
     current_mode = "Forward"
